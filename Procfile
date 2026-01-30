@@ -1,1 +1,1 @@
-web: gunicorn --worker-class eventlet -w 1 server:app --bind 0.0.0.0:5000
+web: gunicorn --worker-class eventlet -w 1 server:app --bind 0.0.0.0:5000 --timeout 120

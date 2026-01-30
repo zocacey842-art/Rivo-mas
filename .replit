@@ -34,3 +34,8 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[deployment]
+deploymentTarget = "vm"
+run = ["gunicorn --worker-class eventlet -w 1 server:app --bind 0.0.0.0:5000 --timeout 120"]
+build = ["pip install -r requirements.txt"]
