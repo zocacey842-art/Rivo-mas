@@ -697,13 +697,13 @@
         <button class="modal-close" onclick="closeModals()">&times;</button>
     </div>
     <div class="modal-body">
-        <div class="input-group">
-            <label>የብር መጠን (Amount)</label>
-            <div class="input-box" style="margin-top: 5px;">
-                <input type="number" id="withdraw-amount" placeholder="ቢያንስ 100" min="100">
-                <span style="color: var(--text-muted); padding-right: 10px;">ETB</span>
+            <div class="input-group">
+                <label>የብር መጠን (Amount) - ቢያንስ 100</label>
+                <div class="input-box" style="margin-top: 5px;">
+                    <input type="number" id="withdraw-amount" placeholder="ቢያንስ 100" min="100">
+                    <span style="color: var(--text-muted); padding-right: 10px;">ETB</span>
+                </div>
             </div>
-        </div>
 
         <div class="input-group" style="margin-top: 15px;">
             <label>የስልክ ቁጥር (Phone Number)</label>
@@ -805,7 +805,7 @@
                 <div style="flex: 1;">
                     <div class="input-box">
                         <button onclick="adjustBet(1, -1)">-</button>
-                        <input type="number" id="bet-amount-1" value="3.00" step="1.00" min="3.00">
+                        <input type="number" id="bet-amount-1" value="3.00" step="1.00" min="3.00" max="500.00">
                         <button onclick="adjustBet(1, 1)">+</button>
                     </div>
                     <div class="presets">
@@ -849,7 +849,7 @@
                 <div style="flex: 1;">
                     <div class="input-box">
                         <button onclick="adjustBet(2, -1)">-</button>
-                        <input type="number" id="bet-amount-2" value="3.00" step="1.00" min="3.00">
+                        <input type="number" id="bet-amount-2" value="3.00" step="1.00" min="3.00" max="500.00">
                         <button onclick="adjustBet(2, 1)">+</button>
                     </div>
                     <div class="presets">
