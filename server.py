@@ -147,23 +147,23 @@ def handle_bet(data):
             pass
 
 def generate_crash_point():
-    # House edge: 10%
-    # Instant crash at 1.00x: 3% chance
-    # Low multipliers (1.10 - 1.50): 57% chance
-    # Medium multipliers (1.50 - 5.00): 30% chance
-    # High multipliers (> 5.00): 10% chance
+    # House edge: 70%
+    # Extremely aggressive profit mode
+    # Instant crash at 1.00x: 40% chance
+    # Very low multipliers (1.01 - 1.10): 40% chance
+    # Low multipliers (1.11 - 1.30): 15% chance
+    # Rare higher multipliers (> 1.30): 5% chance
     
     chance = random.random()
     
-    if chance < 0.03: # 3% Instant crash at 1.00x
+    if chance < 0.40: # 40% Instant crash at 1.00x
         return 1.00
-    elif chance < 0.60: # 57% chance for low multipliers
-        return round(random.uniform(1.10, 1.50), 2)
-    elif chance < 0.90: # 30% chance for medium
-        return round(random.uniform(1.50, 5.00), 2)
-    else: # 10% chance for high
-        # Using a formula for high multipliers that still maintains house edge
-        return round(5.0 + (1 / (1 - random.random() * 0.85)), 2)
+    elif chance < 0.80: # 40% chance for extremely low (1.01 - 1.10)
+        return round(random.uniform(1.01, 1.10), 2)
+    elif chance < 0.95: # 15% chance for low (1.11 - 1.30)
+        return round(random.uniform(1.11, 1.30), 2)
+    else: # 5% chance for rare "spikes" up to 2.0x
+        return round(random.uniform(1.31, 2.00), 2)
 
 def game_loop():
     while True:
