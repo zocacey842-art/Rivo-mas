@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - ROYAL BINGO</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --color-admin-bg: #0f172a;
+            --color-card-bg: #1e293b;
+            --color-primary: #a855f7;
+            --color-secondary: #3b82f6;
+            --color-success: #22c55e;
+            --color-danger: #ef4444;
+            --color-text: #f8fafc;
+            --color-text-dim: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        body {
+            background-color: var(--color-admin-bg);
+            color: var(--color-text);
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            padding-bottom: 100px;
+            min-height: 100vh;
+        }
+
+        .admin-header {
+            background: #1e293b;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .admin-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--color-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--color-card-bg);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            border: 1px solid #334155;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .stat-label {
+            color: var(--color-text-dim);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--color-primary);
+        }
+
+        .admin-card {
+            background: var(--color-card-bg);
+            border-radius: 1rem;
+            border: 1px solid #334155;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .card-header h3 {
+            margin: 0;
+            font-size: 1.125rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        th {
+            background: rgba(0,0,0,0.2);
+            padding: 0.75rem 1.5rem;
+            text-align: left;
+            color: var(--color-text-dim);
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge {
+            padding: 0.25rem 0.625rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-pending { background: rgba(234, 179, 8, 0.1); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.2); }
+        .badge-success { background: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.2); }
+        .badge-danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+
+        .btn-action {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-primary { background: var(--color-primary); color: white; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-outline { background: transparent; border: 1px solid #334155; color: var(--color-text); }
+        .btn-outline:hover { background: rgba(255,255,255,0.05); }
+
+        @media (max-width: 640px) {
+            .admin-header { padding: 1rem; }
+            .admin-header h1 { font-size: 1.25rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header class="admin-header">
+        <h1>🎯 ሮያል ቢንጎ አድሚን</h1>
+        <button class="btn-action btn-outline" onclick="window.location.href='/'">🏠 ወደ ጨዋታው</button>
+    </header>
+
+    <main class="admin-container">
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">አጠቃላይ ተጠቃሚዎች</div>
+                <div id="stat-total-users" class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">ጠቅላላ የተቀመጠ ገንዘብ (Deposit)</div>
+                <div id="stat-total-deposits" class="stat-value">0 ETB</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">ከጨዋታ የተገኘ 20% ኮሚሽን</div>
+                <div id="stat-total-commission" class="stat-value" style="color: #22c55e;">0 ETB</div>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="card-header">
+                <h3>🔍 ተጠቃሚ መፈለጊያ (Search & Update Balance)</h3>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+                    <input type="number" id="search-user-id" placeholder="የተጠቃሚ መለያ (User ID) ያስገቡ..." style="flex: 1; padding: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid #334155; color: white; border-radius: 0.5rem;">
+                    <button class="btn-action btn-primary" onclick="searchUser()">🔍 ፈልግ</button>
+                </div>
+                <div id="search-result-area" style="display: none; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 0.5rem; border: 1px solid #334155;">
+                    <!-- Result will appear here -->
+                </div>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="card-header">
+                <h3>📢 መልእክት ለሁሉም (Broadcast)</h3>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--color-text-dim);">የመልእክት ጽሁፍ (Markdown ይቻላል)</label>
+                    <textarea id="broadcast-message" placeholder="መልእክትዎን እዚህ ይጻፉ..." style="width: 100%; height: 100px; padding: 1rem; background: rgba(0,0,0,0.2); border: 1px solid #334155; color: white; border-radius: 0.5rem; resize: none;"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--color-text-dim);">ምስል (አማራጭ)</label>
+                    <input type="file" id="broadcast-image" accept="image/*" style="width: 100%; color: var(--color-text-dim);">
+                </div>
+                <button class="btn-action btn-primary" id="send-broadcast-btn" onclick="sendBroadcast()">🚀 መልእክቱን ላክ</button>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="card-header">
+                <h3>👥 ተጠቃሚዎች</h3>
+                <button class="btn-action btn-outline" onclick="fetchAdminData()">🔄 አድስ</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>መለያ (ID)</th>
+                            <th>የተጠቃሚ ስም</th>
+                            <th>ቴሌግራም መለያ</th>
+                            <th>ሒሳብ (Balance)</th>
+                            <th>ተግባራት</th>
+                        </tr>
+                    </thead>
+                    <tbody id="user-table-body">
+                        <!-- Users load here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="card-header">
+                <h3>💰 የገንዘብ ማስገቢያ ጥያቄዎች</h3>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ተጠቃሚ</th>
+                            <th>መጠን</th>
+                            <th>ሁኔታ</th>
+                            <th>ተግባራት</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deposit-table-body">
+                        <!-- Deposits load here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="card-header">
+                <h3>💸 የገንዘብ ማውጫ ጥያቄዎች</h3>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ተጠቃሚ</th>
+                            <th>መጠን</th>
+                            <th>መንገድ</th>
+                            <th>ዝርዝር</th>
+                            <th>ሁኔታ</th>
+                            <th>ተግባራት</th>
+                        </tr>
+                    </thead>
+                    <tbody id="withdrawal-table-body">
+                        <!-- Withdrawals load here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        async function fetchAdminData() {
+            let token = localStorage.getItem('bingo_admin_token') || localStorage.getItem('bingo_token');
+            if (!token) return window.location.href = '/';
+
+            try {
+                const res = await fetch('/api/admin/dashboard', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Unauthorized');
+                const data = await res.json();
+                
+                document.getElementById('stat-total-users').textContent = data.totalUsers;
+                document.getElementById('stat-total-deposits').textContent = parseFloat(data.totalDeposits).toFixed(2) + ' ETB';
+                document.getElementById('stat-total-commission').textContent = parseFloat(data.totalCommission || 0).toFixed(2) + ' ETB';
+                
+                const userBody = document.getElementById('user-table-body');
+                userBody.innerHTML = data.users.map(u => `
+                    <tr>
+                        <td style="color: var(--color-text-dim)">#${u.id}</td>
+                        <td style="font-weight: 600">${u.username}</td>
+                        <td style="color: var(--color-text-dim)">${u.telegram_id}</td>
+                        <td style="color: var(--color-primary); font-weight: 700">${parseFloat(u.balance).toFixed(2)} ETB</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn-action btn-primary" onclick="updateBalance(${u.id}, 'add')">➕ ጨምር</button>
+                                <button class="btn-action btn-danger" onclick="updateBalance(${u.id}, 'subtract')">➖ ቀንስ</button>
+                                <button class="btn-action btn-outline" onclick="updateBalance(${u.id}, 'set')">⚙️ ቀይር</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+
+                const depositBody = document.getElementById('deposit-table-body');
+                depositBody.innerHTML = data.deposits.map(d => `
+                    <tr>
+                        <td><strong>${d.username}</strong></td>
+                        <td style="font-weight: 600">${parseFloat(d.amount).toFixed(2)} ETB</td>
+                        <td><span class="badge ${d.status === 'pending' ? 'badge-pending' : (d.status === 'completed' ? 'badge-success' : 'badge-danger')}">${d.status.toUpperCase()}</span></td>
+                        <td>
+                            ${d.status === 'pending' ? `
+                                <div style="display: flex; gap: 5px;">
+                                    <button class="btn-action btn-primary" onclick="approveDeposit(${d.id})">✅ ፍቀድ</button>
+                                    <button class="btn-action btn-danger" onclick="rejectDeposit(${d.id})">❌ ሪጄክት</button>
+                                </div>
+                            ` : '<span style="color: var(--color-text-dim)">ተጠናቅቋል</span>'}
+                        </td>
+                    </tr>
+                `).join('');
+
+                const withdrawalBody = document.getElementById('withdrawal-table-body');
+                withdrawalBody.innerHTML = (data.withdrawals || []).map(w => `
+                    <tr>
+                        <td><strong>${w.username}</strong></td>
+                        <td style="font-weight: 600; color: #ef4444;">${parseFloat(w.amount).toFixed(2)} ETB</td>
+                        <td>${w.phone_number || '-'}</td>
+                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${w.account_name || '-'}</td>
+                        <td><span class="badge ${w.status === 'pending' ? 'badge-pending' : (w.status === 'completed' ? 'badge-success' : 'badge-danger')}">${w.status.toUpperCase()}</span></td>
+                        <td>
+                            ${w.status === 'pending' ? `
+                                <div style="display: flex; gap: 5px;">
+                                    <button class="btn-action btn-primary" onclick="approveWithdrawal(${w.id})">✅ ላክ</button>
+                                    <button class="btn-action btn-danger" onclick="rejectWithdrawal(${w.id})">❌ ሪጄክት</button>
+                                </div>
+                            ` : '<span style="color: var(--color-text-dim)">ተጠናቅቋል</span>'}
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (e) {
+                console.error(e);
+                alert('የአድሚን ገጽ መግባት አልተቻለም');
+                window.location.href = '/';
+            }
+        }
+
+        async function updateBalance(userId, action) {
+            let promptMsg = '';
+            if (action === 'add') promptMsg = 'ለመጨመር የሚፈልጉትን የገንዘብ መጠን ያስገቡ:';
+            else if (action === 'subtract') promptMsg = 'ለመቀነስ የሚፈልጉትን የገንዘብ መጠን ያስገቡ:';
+            else if (action === 'set') promptMsg = 'አዲሱን የሒሳብ መጠን ያስገቡ:';
+
+            const amount = prompt(promptMsg);
+            if (amount === null || isNaN(amount) || amount === '') return;
+            
+            let token = localStorage.getItem('bingo_admin_token') || localStorage.getItem('bingo_token');
+            const res = await fetch('/api/admin/update-balance', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ userId, amount: parseFloat(amount), action })
+            });
+            if (res.ok) fetchAdminData();
+            else alert('ሒሳብ ማስተካከል አልተቻለም');
+        }
+
+        async function approveDeposit(depositId) {
+            if (!confirm('ይህንን የገንዘብ ማስገቢያ ጥያቄ እርግጠኛ ነዎት ይፍቀዱ?')) return;
+            let token = localStorage.getItem('bingo_admin_token') || localStorage.getItem('bingo_token');
+            const res = await fetch('/api/admin/approve-deposit', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ depositId })
+            });
+            if (res.ok) fetchAdminData();
+            else alert('ጥያቄውን መፍቀድ አልተቻለም');
+        }
+
+        async function rejectDeposit(depositId) {
+            const reason = prompt('ጥያቄውን ውድቅ ለማድረግ ምክንያቱን ያስገቡ (አማራጭ):');
+            if (reason === null) return;
+            
+            let token = localStorage.getItem('bingo_admin_token') || localStorage.getItem('bingo_token');
+            const res = await fetch('/api/admin/reject-deposit', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ depositId, reason })
+            });
+            if (res.ok) fetchAdminData();
+            else alert('ጥያቄውን ውድቅ ማድረግ አልተቻለም');
+        }
+
+        async function approveWithdrawal(withdrawalId) {
+            if (!confirm('ይህንን የገንዘብ ማውጫ ጥያቄ እርግጠኛ ነዎት ያጽድቁ? ገንዘቡን መላክዎን ያረጋግጡ!')) return;
+            let token = localStorage.getItem('bingo_admin_token') || localStorage.getItem('bingo_token');
+            const res = await fetch('/api/admin/approve-withdrawal', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ withdrawalId })
+            });
+            if (res.ok) fetchAdminData();
+            else alert('ጥያቄውን ማጽደቅ አልተቻለም');
+        }
+
+        async function rejectWithdrawal(withdrawalId) {
+            const reason = prompt('ጥያቄውን ውድቅ ለማድረግ ምክንያቱን ያስገቡ (አማራጭ):');
+            if (reason === null) return;
+            
+            let token = localStorage.getItem('bingo_admin_token') || localStorage.getItem('bingo_token');
+            const res = await fetch('/api/admin/reject-withdrawal', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ withdrawalId, reason })
+            });
+            if (res.ok) fetchAdminData();
+            else alert('ጥያቄውን ውድቅ ማድረግ አልተቻለም');
+        }
+
+        async function sendBroadcast() {
+            const message = document.getElementById('broadcast-message').value;
+            const imageFile = document.getElementById('broadcast-image').files[0];
+            const btn = document.getElementById('send-broadcast-btn');
+
+            if (!message && !imageFile) {
+                return alert('እባክዎ መልእክት ወይም ምስል ያስገቡ');
+            }
+
+            if (!confirm('ይህ መልእክት ለሁሉም ተጠቃሚዎች ይላካል፡፡ እርግጠኛ ነዎት?')) return;
+
+            btn.disabled = true;
+            btn.textContent = '⏳ በመላክ ላይ...';
+
+            const formData = new FormData();
+            formData.append('message', message);
+            if (imageFile) formData.append('image', imageFile);
+
+            let token = localStorage.getItem('bingo_admin_token') || localStorage.getItem('bingo_token');
+            try {
+                const res = await fetch('/api/admin/broadcast', {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`መልእክቱ በተሳካ ሁኔታ ተልኳል! \nተሳክቷል: ${data.successCount} \nተከሽፏል: ${data.failCount}`);
+                    document.getElementById('broadcast-message').value = '';
+                    document.getElementById('broadcast-image').value = '';
+                } else {
+                    alert('መልእክቱን መላክ አልተቻለም: ' + data.error);
+                }
+            } catch (e) {
+                alert('ስህተት ተከስቷል');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 መልእክቱን ላክ';
+            }
+        }
+
+        async function searchUser() {
+            const userId = document.getElementById('search-user-id').value;
+            if (!userId) return alert('እባክዎ መለያ ቁጥር ያስገቡ');
+
+            const resultArea = document.getElementById('search-result-area');
+            resultArea.style.display = 'block';
+            resultArea.innerHTML = '⏳ በመፈለግ ላይ...';
+
+            let token = localStorage.getItem('bingo_admin_token') || localStorage.getItem('bingo_token');
+            try {
+                // We'll reuse the dashboard logic but filter or create a specific endpoint
+                // For now, let's fetch all and filter in JS (simple approach for existing API)
+                const res = await fetch('/api/admin/dashboard', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const user = data.users.find(u => u.id == userId);
+
+                if (user) {
+                    resultArea.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <p><strong>ስም:</strong> ${user.username}</p>
+                                <p><strong>ቴሌግራም ID:</strong> ${user.telegram_id}</p>
+                                <p><strong>ሒሳብ:</strong> <span style="color: var(--color-primary); font-weight: bold;">${parseFloat(user.balance).toFixed(2)} ETB</span></p>
+                            </div>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn-action btn-primary" onclick="updateBalance(${user.id}, 'add')">➕ ጨምር</button>
+                                <button class="btn-action btn-danger" onclick="updateBalance(${user.id}, 'subtract')">➖ ቀንስ</button>
+                                <button class="btn-action btn-outline" onclick="updateBalance(${user.id}, 'set')">⚙️ ቀይር</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    resultArea.innerHTML = '❌ ተጠቃሚው አልተገኘም';
+                }
+            } catch (e) {
+                resultArea.innerHTML = '❌ ስህተት ተከስቷል';
+            }
+        }
+
+        fetchAdminData();
+        // Auto refresh every 30 seconds
+        setInterval(fetchAdminData, 30000);
+    </script>
+</body>
+</html>

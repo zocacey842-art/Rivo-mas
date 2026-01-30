@@ -1,0 +1,172 @@
+// --- shared/schema.ts ---
+import { pgTable, text, serial, timestamp, boolean } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+export const broadcasts = pgTable("broadcasts", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  status: text("status", { enum: ["success", "failed"] }).notNull(),
+  sentAt: timestamp("sent_at").defaultNow(),
+});
+
+export const insertBroadcastSchema = createInsertSchema(broadcasts).omit({ 
+  id: true, 
+  sentAt: true 
+});
+
+export type Broadcast = typeof broadcasts.$inferSelect;
+export type InsertBroadcast = z.infer<typeof insertBroadcastSchema>;
+
+// --- shared/routes.ts ---
+import { z } from "zod";
+import { insertBroadcastSchema, broadcasts } from "./schema";
+
+export const api = {
+  broadcasts: {
+    list: {
+      method: "GET" as const,
+      path: "/api/broadcasts",
+      responses: {
+        200: z.array(z.custom<typeof broadcasts.$inferSelect>()),
+      },
+    },
+    create: {
+      method: "POST" as const,
+      path: "/api/broadcasts",
+      input: insertBroadcastSchema.pick({ content: true }),
+      responses: {
+        200: z.custom<typeof broadcasts.$inferSelect>(),
+        500: z.object({ message: z.string() }),
+      },
+    },
+  },
+};
+
+export function buildUrl(path: string, params?: Record<string, string | number>): string {
+  let url = path;
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (url.includes(`:${key}`)) {
+        url = url.replace(`:${key}`, String(value));
+      }
+    });
+  }
+  return url;
+}
+
+export type BroadcastInput = z.infer<typeof api.broadcasts.create.input>;
+
+// --- server/storage.ts ---
+import { broadcasts, type InsertBroadcast, type Broadcast } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
+
+export interface IStorage {
+  getBroadcasts(): Promise<Broadcast[]>;
+  createBroadcast(broadcast: InsertBroadcast): Promise<Broadcast>;
+}
+
+export class DatabaseStorage implements IStorage {
+  async getBroadcasts(): Promise<Broadcast[]> {
+    return await db.select().from(broadcasts).orderBy(desc(broadcasts.sentAt));
+  }
+
+  async createBroadcast(insertBroadcast: InsertBroadcast): Promise<Broadcast> {
+    const [broadcast] = await db
+      .insert(broadcasts)
+      .values(insertBroadcast)
+      .returning();
+    return broadcast;
+  }
+}
+
+export const storage = new DatabaseStorage();
+
+// --- server/routes.ts ---
+import type { Express } from "express";
+import type { Server } from "http";
+import { storage } from "./storage";
+import { api } from "@shared/routes";
+import { z } from "zod";
+
+export async function registerRoutes(
+  httpServer: Server,
+  app: Express
+): Promise<Server> {
+  app.get(api.broadcasts.list.path, async (req, res) => {
+    const broadcasts = await storage.getBroadcasts();
+    res.json(broadcasts);
+  });
+
+  app.post(api.broadcasts.create.path, async (req, res) => {
+    try {
+      const { content } = api.broadcasts.create.input.parse(req.body);
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      const chatId = process.env.TELEGRAM_CHAT_ID;
+
+      if (!token || !chatId) {
+        await storage.createBroadcast({ content, status: "failed" });
+        return res.status(500).json({ message: "Telegram credentials not configured" });
+      }
+
+      try {
+        const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, text: content }),
+        });
+        const data = await response.json();
+        const status = (response.ok && data.ok) ? "success" : "failed";
+        const broadcast = await storage.createBroadcast({ content, status });
+        if (status === "failed") return res.status(500).json({ message: data.description });
+        res.json(broadcast);
+      } catch (error) {
+        await storage.createBroadcast({ content, status: "failed" });
+        res.status(500).json({ message: "Failed to connect to Telegram API" });
+      }
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      throw err;
+    }
+  });
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (token) {
+    let lastUpdateId = 0;
+    setInterval(async () => {
+      try {
+        const response = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${lastUpdateId + 1}&timeout=30`);
+        const data = await response.json();
+        if (data.ok && data.result.length > 0) {
+          for (const update of data.result) {
+            lastUpdateId = update.update_id;
+            if (update.message && update.message.text === "/start") {
+              const websiteUrl = process.env.REPL_SLUG && process.env.REPL_OWNER 
+                ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.replit.app`
+                : "የእኛ ድረ-ገጽ";
+              await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: update.message.chat.id,
+                  text: `እንኳን ደህና መጡ! \n\nብሮድካስት ለማስተላለፍ ይህንን ድረ-ገጽ ይጠቀሙ፡ ${websiteUrl}`
+                })
+              });
+            }
+          }
+        }
+      } catch (error) {}
+    }, 5000);
+  }
+  return httpServer;
+}
+
+// --- server/db.ts ---
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
+import * as schema from "@shared/schema";
+
+const { Pool } = pg;
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle(pool, { schema });
