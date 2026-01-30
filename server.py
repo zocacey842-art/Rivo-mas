@@ -20,35 +20,62 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.postgresql import JSONB
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET', 'aviator_pro_secure_key')
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Configuration
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-DOMAIN = os.environ.get('REPLIT_DEV_DOMAIN')
-ADMIN_CHAT_ID = os.environ.get('ADMIN_CHAT_ID')
+db = SQLAlchemy(app)
 
-# --- Persistent Data Management ---
-DATA_FILE = 'game_data.json'
+# --- Database Models ---
+class GameData(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(50), unique=True, nullable=False)
+    value = db.Column(JSONB, nullable=False)
 
-def load_data():
-    if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, 'r') as f:
-                data = json.load(f)
-                if 'notif_queue' not in data: data['notif_queue'] = []
-                if 'broadcasts' not in data: data['broadcasts'] = []
-                if 'history' not in data: data['history'] = []
-                return data
-        except: return {'users': {}, 'withdrawals': {}, 'deposits': {}, 'notif_queue': [], 'broadcasts': [], 'history': []}
-    return {'users': {}, 'withdrawals': {}, 'deposits': {}, 'notif_queue': [], 'broadcasts': [], 'history': []}
+def load_data_from_db():
+    with app.app_context():
+        db.create_all()
+        data = {}
+        for item in GameData.query.all():
+            data[item.key] = item.value
+        
+        # Ensure default keys exist
+        defaults = {
+            'users': {}, 
+            'withdrawals': {}, 
+            'deposits': {}, 
+            'notif_queue': [], 
+            'broadcasts': [], 
+            'history': []
+        }
+        for k, v in defaults.items():
+            if k not in data:
+                data[k] = v
+        return data
 
-def save_data(data):
-    with open(DATA_FILE, 'w') as f:
-        json.dump(data, f)
+def sync_db_to_postgres():
+    with app.app_context():
+        data = {
+            'users': users, 
+            'withdrawals': pending_withdrawals, 
+            'deposits': pending_deposits,
+            'notif_queue': notification_queue,
+            'broadcasts': broadcast_history,
+            'history': game_history
+        }
+        for k, v in data.items():
+            item = GameData.query.filter_by(key=k).first()
+            if item:
+                item.value = v
+            else:
+                db.session.add(GameData(key=k, value=v))
+        db.session.commit()
 
-data_store = load_data()
+data_store = load_data_from_db()
 users = data_store['users']
 pending_withdrawals = data_store['withdrawals']
 pending_deposits = data_store['deposits']
@@ -57,14 +84,7 @@ broadcast_history = data_store.get('broadcasts', [])
 game_history = data_store.get('history', [])
 
 def sync_db():
-    save_data({
-        'users': users, 
-        'withdrawals': pending_withdrawals, 
-        'deposits': pending_deposits,
-        'notif_queue': notification_queue,
-        'broadcasts': broadcast_history,
-        'history': game_history
-    })
+    sync_db_to_postgres()
 
 # --- Notification Queue Service ---
 def notify_user(chat_id, text, reply_markup=None):
