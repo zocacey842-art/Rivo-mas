@@ -29,6 +29,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
+# Configuration
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+DOMAIN = os.environ.get('REPLIT_DEV_DOMAIN')
+ADMIN_CHAT_ID = os.environ.get('ADMIN_CHAT_ID')
 
 # --- Database Models ---
 class GameData(db.Model):
