@@ -199,20 +199,44 @@ async def start_command(update, context):
     chat_id = str(update.message.chat_id)
     ref = context.args[0] if context.args else None
     if chat_id not in users:
-        users[chat_id] = {'phone': None, 'balance': 5.0, 'referred_by': ref, 'reg_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        users[chat_id] = {
+            'phone': None, 
+            'balance': 5.0, 
+            'referred_by': ref, 
+            'reg_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'total_deposited': 0
+        }
         if ref and ref in users and ref != chat_id:
             users[ref]['balance'] += 2.0
-            notify_user(ref, "<b>🎁 የሪፈራል ቦነስ!</b>\nአዲስ ሰው ስለጋበዙ 2.00 ETB ተጨምሯል።")
+            notify_user(ref, "<b>🎁 የሪፈራል ቦነስ!</b>\n\nአዲስ ሰው ስለጋበዙ <b>2.00 ETB</b> ተጨምሯል። 🎊")
         sync_db()
+    
     if not users[chat_id].get('phone'):
         btn = KeyboardButton(text="📱 ስልክ ቁጥርዎን ያጋሩ", request_contact=True)
-        await update.message.reply_text("👋 እንኳን በደህና መጡ! ለመመዝገብ እባክዎ ስልክዎን ያጋሩ።", reply_markup=ReplyKeyboardMarkup([[btn]], resize_keyboard=True))
+        await update.message.reply_text(
+            "👋 **እንኳን በደህና መጡ!**\n\nለመመዝገብ እና ጨዋታውን ለመጀመር እባክዎ ስልክዎን ያጋሩ። 👇", 
+            reply_markup=ReplyKeyboardMarkup([[btn]], resize_keyboard=True),
+            parse_mode='Markdown'
+        )
     else: await show_main_menu(update, chat_id)
 
+async def contact_handler(update, context):
+    chat_id = str(update.message.chat_id)
+    if chat_id in users:
+        users[chat_id]['phone'] = update.message.contact.phone_number
+        sync_db()
+        await update.message.reply_text("✅ **ምዝገባው ተሳክቷል!**\n\nአሁን ጨዋታውን መጀመር ይችላሉ። 🎮", parse_mode='Markdown')
+        await show_main_menu(update, chat_id)
+
 async def show_main_menu(update, chat_id):
-    kb = [[KeyboardButton("👤 ፕሮፋይል"), KeyboardButton("💰 ዋሌት")], [KeyboardButton("💳 ተቀማጭ"), KeyboardButton("💸 ወጪ")], [KeyboardButton("🔗 ሪፈራል"), KeyboardButton("🎮 ወደ ጨዋታው")]]
-    if str(chat_id) == str(ADMIN_CHAT_ID): kb.append([KeyboardButton("📢 ብሮድካስት")])
-    await update.message.reply_text("ዋና ዝርዝር:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+    kb = [
+        [KeyboardButton("👤 ፕሮፋይል"), KeyboardButton("💰 ዋሌት")], 
+        [KeyboardButton("💳 ተቀማጭ"), KeyboardButton("💸 ወጪ")], 
+        [KeyboardButton("🔗 ሪፈራል"), KeyboardButton("🎮 ወደ ጨዋታው")]
+    ]
+    if str(chat_id) == str(ADMIN_CHAT_ID): 
+        kb.append([KeyboardButton("📢 ብሮድካስት")])
+    await update.message.reply_text("🚀 **ዋና ዝርዝር (Main Menu):**", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True), parse_mode='Markdown')
 
 async def handle_message(update, context):
     if not update.message or not update.message.text: return
@@ -222,51 +246,51 @@ async def handle_message(update, context):
             msg = text.replace("/broadcast ", "", 1).strip()
             if msg:
                 count = create_broadcast(f"<b>📢 መልዕክት ከአድሚን:</b>\n\n{msg}")
-                await update.message.reply_text(f"🚀 ብሮድካስት ለ {count} ተጠቃሚዎች በኩዌ (Queue) በኩል እየተላከ ነው...")
+                await update.message.reply_text(f"🚀 ብሮድካስት ለ {count} ተጠቃሚዎች በኩዌ (Queue) በኩል እየተላከ ነው... 📤")
             else:
                 await update.message.reply_text("⚠️ እባክዎ መልዕክት ይጻፉ።")
             return
         elif text == "📢 ብሮድካስት":
-            await update.message.reply_text("እንዲህ ይጻፉ: `/broadcast መልዕክትዎ`", parse_mode='Markdown')
+            await update.message.reply_text("📣 እንዲህ ይጻፉ: `/broadcast መልዕክትዎ`", parse_mode='Markdown')
             return
 
     if chat_id not in users: return await start_command(update, context)
     user = users[chat_id]
     if text == "👤 ፕሮፋይል": 
-        await update.message.reply_text(f"<b>👤 ፕሮፋይል</b>\nID: {chat_id}\nስልክ: {user['phone']}\nቀሪ ሂሳብ: {user['balance']:.2f} ETB")
+        await update.message.reply_text(f"<b>👤 የእርስዎ ፕሮፋይል</b>\n\n🆔 ID: <code>{chat_id}</code>\n📱 ስልክ: {user['phone']}\n💰 ቀሪ ሂሳብ: <b>{user['balance']:.2f} ETB</b>\n📅 የተመዘገቡበት: {user.get('reg_date', 'N/A')}")
     elif text == "💰 ዋሌት": 
-        await update.message.reply_text(f"<b>💰 ዋሌት</b>\nቀሪ ሂሳብ: {user['balance']:.2f} ETB")
+        await update.message.reply_text(f"<b>💰 ዋሌት (Wallet)</b>\n\n💵 የአሁኑ ቀሪ ሂሳብዎ: <b>{user['balance']:.2f} ETB</b>\n📈 አጠቃላይ ያስገቡት: {user.get('total_deposited', 0):.2f} ETB")
     elif text == "💳 ተቀማጭ":
         msg = (
             "<b>💳 ገንዘብ ለማስገባት (Deposit)</b>\n\n"
-            "1. ወደዚ የቴሌብር ቁጥር ብር ይላኩ: <code>0975118009</code>\n"
-            "2. ብር ከላኩ በኋላ ከቴሌብር የደረስዎትን ሙሉ መልዕክት ኮፒ ያድርጉ\n"
-            "3. ወደ ጨዋታው ዌብሳይት በመሄድ ተቀማጭ (Deposit) የሚለውን ይጫኑ\n"
-            "4. የላኩትን የብር መጠን እና የቴሌብር መልዕክቱን ያስገቡ\n\n"
-            "<i>አድሚኑ መረጃውን እንዳረጋገጠ ወዲያውኑ ብሩ በዋሌትዎ ላይ ይታያል።</i>"
+            "1️⃣ ወደዚ የቴሌብር ቁጥር ብር ይላኩ: <code>0975118009</code>\n"
+            "2️⃣ ብር ከላኩ በኋላ ከቴሌብር የደረስዎትን ሙሉ መልዕክት ኮፒ ያድርጉ\n"
+            "3️⃣ ወደ ጨዋታው ዌብሳይት በመሄድ <b>ተቀማጭ (Deposit)</b> የሚለውን ይጫኑ\n"
+            "4️⃣ የላኩትን የብር መጠን እና የቴሌብር መልዕክቱን ያስገቡ\n\n"
+            "⚠️ <i>አድሚኑ መረጃውን እንዳረጋገጠ ወዲያውኑ ብሩ በዋሌትዎ ላይ ይታያል።</i> ⏳"
         )
         await update.message.reply_text(msg, parse_mode='HTML')
     elif text == "💸 ወጪ":
         msg = (
             "<b>💸 ገንዘብ ለማውጣት (Withdraw)</b>\n\n"
-            "1. ወደ ጨዋታው ዌብሳይት ይግቡ\n"
-            "2. ወጪ (Withdraw) የሚለውን ምርጫ ይጫኑ\n"
-            "3. ማውጣት የሚፈልጉትን የብር መጠን እና የቴሌብር ስልክ ቁጥርዎን ያስገቡ\n"
-            "4. ጥያቄዎን ይላኩ\n\n"
-            "<i>ማሳሰቢያ: ዝቅተኛው የማውጫ መጠን 100 ETB ነው።</i>"
+            "1️⃣ ወደ ጨዋታው ዌብሳይት ይግቡ\n"
+            "2️⃣ <b>ወጪ (Withdraw)</b> የሚለውን ምርጫ ይጫኑ\n"
+            "3️⃣ ማውጣት የሚፈልጉትን የብር መጠን እና የቴሌብር ስልክ ቁጥርዎን ያስገቡ\n"
+            "4️⃣ ጥያቄዎን ይላኩ 📤\n\n"
+            "ℹ️ <i>ማሳሰቢያ: ዝቅተኛው የማውጫ መጠን 100 ETB ነው።</i>"
         )
         await update.message.reply_text(msg, parse_mode='HTML')
     elif text == "🔗 ሪፈራል":
         ref_link = f"https://t.me/revoavio_bot?start={chat_id}"
         msg = (
-            "<b>🔗 የሪፈራል ሊንክ</b>\n\n"
-            "ይህንን ሊንክ ለጓደኞችዎ በመላክ ይጋብዙ። አዲስ ሰው ሲጋብዙ የ2.00 ETB ቦነስ ያገኛሉ!\n\n"
-            f"የእርስዎ ሊንክ: <code>{ref_link}</code>"
+            "<b>🔗 የሪፈራል ሊንክ (Referral)</b>\n\n"
+            "🎁 ይህንን ሊንክ ለጓደኞችዎ በመላክ ይጋብዙ። አዲስ ሰው ሲጋብዙ የ <b>2.00 ETB</b> ቦነስ ያገኛሉ!\n\n"
+            f"📍 የእርስዎ ሊንክ: <code>{ref_link}</code>"
         )
         await update.message.reply_text(msg, parse_mode='HTML')
     elif text == "🎮 ወደ ጨዋታው":
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("🎮 ጨዋታውን ክፈት", url=f"https://{DOMAIN}/?tid={chat_id}")]])
-        await update.message.reply_text("ወደ ጨዋታው ለመግባት:", reply_markup=markup)
+        await update.message.reply_text("🕹️ **መልካም ጨዋታ!**\n\nወደ ጨዋታው ለመግባት ከታች ያለውን ሊንክ ይጫኑ፡", reply_markup=markup, parse_mode='Markdown')
     else: await show_main_menu(update, chat_id)
 
 async def contact_handler(update, context):
