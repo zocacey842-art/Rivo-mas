@@ -39,9 +39,10 @@ def load_data():
                 data = json.load(f)
                 if 'notif_queue' not in data: data['notif_queue'] = []
                 if 'broadcasts' not in data: data['broadcasts'] = []
+                if 'history' not in data: data['history'] = []
                 return data
-        except: return {'users': {}, 'withdrawals': {}, 'deposits': {}, 'notif_queue': [], 'broadcasts': []}
-    return {'users': {}, 'withdrawals': {}, 'deposits': {}, 'notif_queue': [], 'broadcasts': []}
+        except: return {'users': {}, 'withdrawals': {}, 'deposits': {}, 'notif_queue': [], 'broadcasts': [], 'history': []}
+    return {'users': {}, 'withdrawals': {}, 'deposits': {}, 'notif_queue': [], 'broadcasts': [], 'history': []}
 
 def save_data(data):
     with open(DATA_FILE, 'w') as f:
@@ -53,6 +54,7 @@ pending_withdrawals = data_store['withdrawals']
 pending_deposits = data_store['deposits']
 notification_queue = data_store['notif_queue']
 broadcast_history = data_store.get('broadcasts', [])
+game_history = data_store.get('history', [])
 
 def sync_db():
     save_data({
@@ -60,7 +62,8 @@ def sync_db():
         'withdrawals': pending_withdrawals, 
         'deposits': pending_deposits,
         'notif_queue': notification_queue,
-        'broadcasts': broadcast_history
+        'broadcasts': broadcast_history,
+        'history': game_history
     })
 
 # --- Notification Queue Service ---
@@ -126,7 +129,11 @@ def notify_admin(text, reply_markup=None):
     if ADMIN_CHAT_ID: notify_user(ADMIN_CHAT_ID, f"<b>🔔 አድሚን ማሳሰቢያ:</b>\n{text}", reply_markup=reply_markup)
 
 # --- Core Game Logic ---
-game_state = {'phase': 'waiting', 'countdown': 7, 'multiplier': 1.00, 'crash_point': 0, 'history': []}
+game_state = {'phase': 'waiting', 'countdown': 7, 'multiplier': 1.00, 'crash_point': 0, 'history': game_history}
+
+@socketio.on('connect')
+def handle_connect():
+    emit('game_state', game_state)
 
 def generate_crash_point():
     # House edge and profitability tuning
@@ -165,6 +172,9 @@ def game_loop():
         game_state['phase'] = 'crashed'
         game_state['history'].insert(0, game_state['crash_point'])
         game_state['history'] = game_state['history'][:20]
+        global game_history
+        game_history = game_state['history']
+        sync_db()
         socketio.emit('game_state', {'phase': 'crashed', 'multiplier': game_state['crash_point'], 'history': game_state['history']})
         eventlet.sleep(3)
 
