@@ -131,9 +131,20 @@ def notify_admin(text, reply_markup=None):
 # --- Core Game Logic ---
 game_state = {'phase': 'waiting', 'countdown': 7, 'multiplier': 1.00, 'crash_point': 0, 'history': game_history}
 
-@socketio.on('connect')
-def handle_connect():
-    emit('game_state', game_state)
+@socketio.on('place_bet')
+def handle_bet(data):
+    tid = str(data.get('telegram_id'))
+    amount = float(data.get('amount'))
+    if tid in users and not users[tid].get('is_banned'):
+        if amount < 3:
+            emit('bet_error', {'message': 'ዝቅተኛው ውርርድ 3 ETB ነው።'})
+            return
+        if amount > 500:
+            emit('bet_error', {'message': 'ከፍተኛው ውርርድ 500 ETB ነው።'})
+            return
+        if users[tid]['balance'] >= amount:
+            # Logic for placing bet... (needs to be integrated with game_loop)
+            pass
 
 def generate_crash_point():
     # House edge and profitability tuning
@@ -272,6 +283,7 @@ async def button_handler(update, context):
             tid, amt = str(dep['tg_id']), float(dep['amount'])
             if tid in users:
                 users[tid]['balance'] += amt
+                users[tid]['total_deposited'] = users[tid].get('total_deposited', 0) + amt
                 sync_db()
                 notify_user(tid, f"<b>✅ ተቀማጭ ተረጋግጧል!</b>\nመጠን: {amt} ETB\nአዲስ ቀሪ ሂሳብ: {users[tid]['balance']:.2f} ETB")
                 await query.edit_message_text(f"✅ ተቀማጭ ተፈቅዷል!\nተጠቃሚ: {tid}\nመጠን: {amt} ETB")
@@ -370,6 +382,7 @@ def approve_dep():
         tid, amt = str(dep['tg_id']), float(dep['amount'])
         if tid in users:
             users[tid]['balance'] += amt
+            users[tid]['total_deposited'] = users[tid].get('total_deposited', 0) + amt
             sync_db()
             notify_user(tid, f"<b>✅ ተቀማጭ ተረጋግጧል!</b>\nመጠን: {amt} ETB\nቀሪ: {users[tid]['balance']:.2f} ETB")
             return jsonify({'success': True})
@@ -408,11 +421,35 @@ def submit_deposit():
 @app.route('/api/withdraw', methods=['POST'])
 def submit_withdraw():
     data = request.json
+    tid = str(data.get('telegram_id'))
+    amount = float(data.get('amount'))
+    
+    # 1. Check if user exists
+    if tid not in users:
+        return jsonify({'success': False, 'message': 'ተጠቃሚው አልተገኘም።'})
+    
+    # 2. Min withdrawal limit
+    if amount < 100:
+        return jsonify({'success': False, 'message': 'ዝቅተኛው የማውጫ መጠን 100 ETB ነው።'})
+    
+    # 3. Balance check
+    if users[tid]['balance'] < amount:
+        return jsonify({'success': False, 'message': 'በቂ ቀሪ ሂሳብ የለዎትም።'})
+
+    # 4. Total deposit check (Min 100 ETB history)
+    total_deposits = 0
+    # Check approved deposits in users history if we tracked it, 
+    # but based on current server.py, we only have pending_deposits and users['balance'].
+    # We need to ensure we track total deposits in user object.
+    if users[tid].get('total_deposited', 0) < 100:
+        return jsonify({'success': False, 'message': 'ገንዘብ ለማውጣት ቢያንስ 100 ETB ዲፖዚት ማድረግ ይኖርብዎታል።'})
+
     rid = f"w_{int(time.time()*1000)}"
-    pending_withdrawals[rid] = {'tg_id': data.get('telegram_id'), 'amount': data.get('amount'), 'phone': data.get('phone'), 'ts': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    users[tid]['balance'] -= amount
+    pending_withdrawals[rid] = {'tg_id': tid, 'amount': amount, 'phone': data.get('phone'), 'ts': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     sync_db()
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ ፍቀድ", callback_data=f"app_with_{rid}"), InlineKeyboardButton("❌ ውድቅ", callback_data=f"rej_with_{rid}")]])
-    notify_admin(f"<b>💸 አዲስ ወጪ</b>\n\n👤 ተጠቃሚ: {data.get('telegram_id')}\n💵 መጠን: {data.get('amount')} ETB\n📱 ስልክ: {data.get('phone')}", reply_markup=kb)
+    notify_admin(f"<b>💸 አዲስ ወጪ</b>\n\n👤 ተጠቃሚ: {tid}\n💵 መጠን: {amount} ETB\n📱 ስልክ: {data.get('phone')}", reply_markup=kb)
     return jsonify({'success': True})
 
 if __name__ == '__main__':
