@@ -99,14 +99,23 @@ def sync_db():
 # --- Notification Queue Service ---
 def notify_user(chat_id, text, reply_markup=None):
     if not TELEGRAM_BOT_TOKEN or not chat_id: return
-    notif = {
-        'chat_id': str(chat_id),
-        'text': text,
-        'reply_markup': reply_markup.to_dict() if hasattr(reply_markup, 'to_dict') else reply_markup,
-        'ts': time.time()
-    }
-    notification_queue.append(notif)
-    sync_db()
+    try:
+        if app_bot and bot_loop:
+            asyncio.run_coroutine_threadsafe(
+                app_bot.bot.send_message(chat_id=chat_id, text=text, parse_mode='HTML', reply_markup=reply_markup),
+                bot_loop
+            )
+        else:
+            notif = {
+                'chat_id': str(chat_id),
+                'text': text,
+                'reply_markup': reply_markup.to_dict() if hasattr(reply_markup, 'to_dict') else reply_markup,
+                'ts': time.time()
+            }
+            notification_queue.append(notif)
+            sync_db()
+    except Exception as e:
+        logger.error(f"Error in notify_user: {e}")
 
 def notification_worker():
     logger.info("Notification worker thread started")
@@ -121,21 +130,15 @@ def notification_worker():
                 
                 resp = requests.post(url, json=payload, timeout=20)
                 data = resp.json()
-                status = "success" if resp.ok and data.get("ok") else "failed"
-                
-                if status == "success":
+                if resp.ok and data.get("ok"):
                     notification_queue.pop(0)
                     sync_db()
                     logger.info(f"Worker: Sent notif to {notif['chat_id']}")
-                    time.sleep(0.05)
                 else:
                     err_msg = data.get('description', 'Unknown error')
                     logger.error(f"Worker Error: {err_msg}")
-                    if "forbidden" in err_msg.lower() or "chat not found" in err_msg.lower():
-                        notification_queue.pop(0)
-                        sync_db()
-                    else:
-                        time.sleep(2)
+                    notification_queue.pop(0)
+                    sync_db()
             except Exception as e:
                 logger.error(f"Worker Exception: {e}")
                 time.sleep(5)
@@ -398,11 +401,9 @@ def webhook():
     if not TELEGRAM_BOT_TOKEN:
         return 'Bot token not set', 400
     
-    # Process updates synchronously for webhook
-    update = Update.de_json(request.get_json(force=True), app_bot)
+    # Process updates asynchronously for webhook
+    update = Update.de_json(request.get_json(force=True), app_bot.bot)
     
-    # We need a shared event loop or handle it differently for webhooks
-    # For simplicity with python-telegram-bot v20+, we'll use the application's process_update
     asyncio.run_coroutine_threadsafe(app_bot.process_update(update), bot_loop)
     
     return 'ok'
