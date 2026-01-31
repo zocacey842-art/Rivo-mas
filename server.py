@@ -305,8 +305,15 @@ def run_bot_thread():
             bot_loop.run_until_complete(app_bot.bot.set_webhook(url=full_webhook_url))
         
         logger.info("Bot loop starting...")
+        # Check if we are in production (webhook mode) or development (polling)
         if os.environ.get('RENDER_EXTERNAL_URL'):
             logger.info("Production mode: Webhook active")
+            # In production, we strictly use webhook and ensure polling is NOT running
+            try:
+                bot_loop.run_until_complete(app_bot.bot.delete_webhook(drop_pending_updates=True))
+                time.sleep(1)
+            except: pass
+            
             if webhook_url:
                 if not webhook_url.startswith('http'): webhook_url = f"https://{webhook_url}"
                 full_webhook_url = f"{webhook_url.rstrip('/')}/webhook"
@@ -315,15 +322,16 @@ def run_bot_thread():
             bot_loop.run_forever()
         else:
             logger.info("Development mode: Polling")
-            # Ensure webhook is deleted before starting polling to avoid conflict
+            # Clear webhook and wait longer to ensure Telegram updates its state
             try:
                 bot_loop.run_until_complete(app_bot.bot.delete_webhook(drop_pending_updates=True))
-                logger.info("Webhook deleted successfully")
+                logger.info("Webhook cleared, waiting for Telegram state update...")
+                time.sleep(5) 
             except Exception as e:
-                logger.error(f"Error deleting webhook: {e}")
+                logger.error(f"Error clearing webhook: {e}")
             
-            # Start polling
-            app_bot.run_polling(close_loop=False, drop_pending_updates=True)
+            # Start polling with explicit clean start
+            app_bot.run_polling(close_loop=False, drop_pending_updates=True, stop_signals=None)
     except Exception as e:
         logger.error(f"Fatal bot error: {e}", exc_info=True)
 
