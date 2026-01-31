@@ -198,6 +198,10 @@ def process_telegram_update(update):
         asyncio.set_event_loop(loop)
         
         if text.startswith("/start"):
+            # Custom welcome message requested by user
+            welcome_text = "<b>እንኳን ደህና መጡ! ጨዋታውን ለመጀመር ዝግጁ ነዎት?</b>"
+            notify_user(chat_id, welcome_text)
+            # Original start command logic (keyboard, referral, etc)
             loop.run_until_complete(start_command(MockUpdate(msg, user), MockContext(text)))
         else:
             loop.run_until_complete(handle_message(MockUpdate(msg, user), MockContext(text)))
