@@ -142,21 +142,28 @@ def telegram_polling():
     
     # First, delete any existing webhook to allow polling
     try:
+        # In Render, we might have multiple instances or quick restarts.
+        # We ensure we clear webhook specifically for this token.
         requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=True")
         time.sleep(2)
     except: pass
 
     while True:
         try:
+            # Short timeout and long polling to be more responsive and less likely to hit 409
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
-            params = {"offset": last_update_id + 1, "timeout": 30}
-            resp = requests.get(url, params=params, timeout=35)
+            params = {"offset": last_update_id + 1, "timeout": 20}
+            resp = requests.get(url, params=params, timeout=25)
             
             if resp.ok:
                 updates = resp.json().get("result", [])
                 for update in updates:
                     last_update_id = update["update_id"]
                     process_telegram_update(update)
+            elif resp.status_code == 409:
+                logger.warning("Conflict (409) detected. Another instance might be running. Retrying in 10s...")
+                # If there's a conflict, wait longer to let the other instance (maybe old one) die
+                time.sleep(10)
             else:
                 logger.error(f"Polling error: {resp.status_code}")
                 time.sleep(5)
