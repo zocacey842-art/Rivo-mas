@@ -165,22 +165,34 @@ def notification_worker():
 async def start_command(update: Update, context):
     user = update.effective_user
     tid = str(user.id)
+    args = context.args
+    
     keyboard = [
         [KeyboardButton("🎮 ጨዋታውን ክፈት")],
         [KeyboardButton("💰 ተቀማጭ / Deposit"), KeyboardButton("💸 ወጪ / Withdraw")],
-        [KeyboardButton("👤 ፕሮፋይል / Profile"), KeyboardButton("📞 ድጋፍ / Support")]
+        [KeyboardButton("👥 ሪፈር / Refer"), KeyboardButton("👤 ፕሮፋይል / Profile")],
+        [KeyboardButton("📞 ድጋፍ / Support")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     if tid not in users:
+        # Check for referrer
+        referrer_id = args[0] if args else None
+        
         users[tid] = {
             'tg_id': tid,
             'username': user.username or user.first_name,
             'balance': 5.0,
             'total_deposited': 0,
             'is_banned': False,
-            'joined_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            'joined_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'referred_by': referrer_id
         }
+        
+        if referrer_id and referrer_id in users and referrer_id != tid:
+            users[referrer_id]['balance'] += 2.0
+            notify_user(referrer_id, f"<b>👥 አዲስ ሪፈር!</b>\nበጓደኛዎ ግብዣ 2.00 ETB ወደ ሂሳብዎ ተጨምሯል።")
+            
         sync_db()
         await update.message.reply_html(
             f"<b>እንኳን ደህና መጡ {user.first_name}!</b>\n\nየእርስዎ ID: <code>{tid}</code>\nየመጀመሪያ ቦነስ: 5 ETB ተሰጥቶዎታል።\n\nለመጫወት ይህንን ID በዌብሳይቱ ላይ ይጠቀሙ።",
@@ -219,6 +231,14 @@ async def handle_message(update: Update, context):
             f"ስም: {user_data.get('username', 'N/A')}\n"
             f"ቀሪ ሂሳብ: {user_data.get('balance', 0):.2f} ETB\n"
             f"የተቀመጠ ብር: {user_data.get('total_deposited', 0):.2f} ETB"
+        )
+    elif text == "👥 ሪፈር / Refer":
+        bot_info = await context.bot.get_me()
+        refer_link = f"https://t.me/{bot_info.username}?start={tid}"
+        await update.message.reply_html(
+            f"<b>👥 የሪፈራል ፕሮግራም</b>\n\n"
+            f"ጓደኞችዎን ይጋብዙ እና በእያንዳንዱ ሰው 2.00 ETB ጉርሻ ያግኙ!\n\n"
+            f"<b>የእርስዎ የመጋበዣ ሊንክ:</b>\n{refer_link}"
         )
     elif text == "📞 ድጋፍ / Support":
         await update.message.reply_html("<b>📞 የድጋፍ መስጫ</b>\n\nማንኛውም ጥያቄ ወይም እርዳታ ካስፈለገዎት አድሚኑን ያነጋግሩ:\n@revo_admin")
