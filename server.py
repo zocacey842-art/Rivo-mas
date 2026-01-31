@@ -393,24 +393,50 @@ async def button_handler(update, context):
             await query.edit_message_text(f"❌ የወጪ ጥያቄ ውድቅ ተደርጓል!\nተጠቃሚ: {w['tg_id']}")
         else: await query.edit_message_text("❌ ጥያቄው አልተገኘም")
 
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if not TELEGRAM_BOT_TOKEN:
+        return 'Bot token not set', 400
+    
+    # Process updates synchronously for webhook
+    update = Update.de_json(request.get_json(force=True), app_bot)
+    
+    # We need a shared event loop or handle it differently for webhooks
+    # For simplicity with python-telegram-bot v20+, we'll use the application's process_update
+    asyncio.run_coroutine_threadsafe(app_bot.process_update(update), bot_loop)
+    
+    return 'ok'
+
 def run_bot_thread():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    global bot_loop, app_bot
+    bot_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(bot_loop)
     
-    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    app_bot = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(CallbackQueryHandler(button_handler))
+    app_bot.add_handler(CommandHandler("start", start_command))
+    app_bot.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app_bot.add_handler(CallbackQueryHandler(button_handler))
     
-    logger.info("Application started in polling mode")
-    application.run_polling(drop_pending_updates=True)
+    # Initialize application
+    bot_loop.run_until_complete(app_bot.initialize())
+    
+    # Set webhook
+    webhook_url = f"{DOMAIN}/webhook"
+    logger.info(f"Setting webhook to: {webhook_url}")
+    bot_loop.run_until_complete(app_bot.bot.set_webhook(url=webhook_url))
+    
+    bot_loop.run_forever()
 
 if __name__ == '__main__':
     # Initialize DB and data
     with app.app_context():
         db.create_all()
+    
+    # Global references for webhook
+    bot_loop = None
+    app_bot = None
     
     # Start bot thread
     threading.Thread(target=run_bot_thread, daemon=True).start()
@@ -420,7 +446,7 @@ if __name__ == '__main__':
     
     # Run Flask-SocketIO
     logger.info("Starting Flask-SocketIO server on port 5000")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False, log_output=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
 @app.route('/')
 def index(): return send_from_directory('.', 'index.html')
