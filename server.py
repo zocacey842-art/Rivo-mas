@@ -423,7 +423,11 @@ def run_bot_thread():
     bot_loop.run_until_complete(app_bot.initialize())
     
     # Set webhook
-    webhook_url = f"{DOMAIN}/webhook"
+    webhook_url = DOMAIN
+    if not webhook_url.startswith('http'):
+        webhook_url = f"https://{webhook_url}"
+    webhook_url = f"{webhook_url.rstrip('/')}/webhook"
+    
     logger.info(f"Setting webhook to: {webhook_url}")
     bot_loop.run_until_complete(app_bot.bot.set_webhook(url=webhook_url))
     
