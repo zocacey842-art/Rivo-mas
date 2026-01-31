@@ -396,15 +396,31 @@ async def button_handler(update, context):
 def run_bot_thread():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    app_bot = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    app_bot.add_handler(CommandHandler("start", start_command))
-    app_bot.add_handler(MessageHandler(filters.CONTACT, contact_handler))
-    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app_bot.add_handler(CallbackQueryHandler(button_handler))
-    loop.run_until_complete(app_bot.initialize())
-    loop.run_until_complete(app_bot.start())
-    loop.run_until_complete(app_bot.updater.start_polling())
-    loop.run_forever()
+    
+    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    
+    logger.info("Application started in polling mode")
+    application.run_polling(drop_pending_updates=True)
+
+if __name__ == '__main__':
+    # Initialize DB and data
+    with app.app_context():
+        db.create_all()
+    
+    # Start bot thread
+    threading.Thread(target=run_bot_thread, daemon=True).start()
+    
+    # Start notification worker
+    threading.Thread(target=notification_worker, daemon=True).start()
+    
+    # Run Flask-SocketIO
+    logger.info("Starting Flask-SocketIO server on port 5000")
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False, log_output=True)
 
 @app.route('/')
 def index(): return send_from_directory('.', 'index.html')
