@@ -424,9 +424,15 @@ def run_bot_thread():
     bot_loop.run_until_complete(app_bot.initialize())
     
     # Set webhook
-    webhook_url = DOMAIN
+    webhook_url = os.environ.get('REPLIT_DEV_DOMAIN') or os.environ.get('RENDER_EXTERNAL_URL')
+    
+    if not webhook_url:
+        logger.warning("No domain found in environment variables. Webhook might not work correctly.")
+        return
+
     if not webhook_url.startswith('http'):
         webhook_url = f"https://{webhook_url}"
+    
     webhook_url = f"{webhook_url.rstrip('/')}/webhook"
     
     logger.info(f"Setting webhook to: {webhook_url}")
