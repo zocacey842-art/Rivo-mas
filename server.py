@@ -103,30 +103,107 @@ def sync_db():
 def notify_user(chat_id, text, reply_markup=None):
     if not TELEGRAM_BOT_TOKEN or not chat_id: return
     try:
-        global app_bot, bot_loop
-        logger.info(f"Notify User: Attempting to send message to {chat_id}")
-        if app_bot and bot_loop:
-            asyncio.run_coroutine_threadsafe(
-                app_bot.bot.send_message(chat_id=int(chat_id), text=text, parse_mode='HTML', reply_markup=reply_markup),
-                bot_loop
-            )
-            logger.info(f"Notify User: Message task scheduled for {chat_id}")
-        else:
-            logger.warning(f"Notify User: Bot not ready, queuing message for {chat_id}")
-            notif = {
-                'chat_id': str(chat_id),
-                'text': text,
-                'reply_markup': reply_markup.to_dict() if hasattr(reply_markup, 'to_dict') else reply_markup,
-                'ts': time.time()
-            }
-            notification_queue.append(notif)
-            sync_db()
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": int(chat_id),
+            "text": text,
+            "parse_mode": "HTML"
+        }
+        if reply_markup:
+            payload["reply_markup"] = json.dumps(reply_markup.to_dict() if hasattr(reply_markup, 'to_dict') else reply_markup)
+        
+        # Use a background thread for non-blocking HTTP request
+        def send_request():
+            try:
+                requests.post(url, json=payload, timeout=10)
+            except:
+                pass
+        
+        threading.Thread(target=send_request).start()
     except Exception as e:
-        logger.error(f"Error in notify_user: {e}", exc_info=True)
+        logger.error(f"Error in notify_user: {e}")
 
 def notify_admin(text, reply_markup=None):
     if ADMIN_CHAT_ID:
         notify_user(ADMIN_CHAT_ID, text, reply_markup)
+
+# --- Telegram Bot Polling Implementation (Pure Requests) ---
+def telegram_polling():
+    logger.info("Starting pure-request Telegram polling...")
+    last_update_id = 0
+    
+    # First, delete any existing webhook to allow polling
+    try:
+        requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=True")
+        time.sleep(2)
+    except: pass
+
+    while True:
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+            params = {"offset": last_update_id + 1, "timeout": 30}
+            resp = requests.get(url, params=params, timeout=35)
+            
+            if resp.ok:
+                updates = resp.json().get("result", [])
+                for update in updates:
+                    last_update_id = update["update_id"]
+                    process_telegram_update(update)
+            else:
+                logger.error(f"Polling error: {resp.status_code}")
+                time.sleep(5)
+        except Exception as e:
+            logger.error(f"Polling exception: {e}")
+            time.sleep(5)
+
+def process_telegram_update(update):
+    if "message" in update:
+        msg = update["message"]
+        chat_id = str(msg["chat"]["id"])
+        user = msg.get("from", {})
+        text = msg.get("text", "")
+
+        # Mock objects for existing handlers
+        class MockUpdate:
+            def __init__(self, msg, user):
+                self.message = MockMessage(msg)
+                self.effective_user = MockUser(user)
+        
+        class MockMessage:
+            def __init__(self, msg):
+                self.text = msg.get("text", "")
+                self.chat_id = msg["chat"]["id"]
+            async def reply_html(self, text, reply_markup=None, parse_mode='HTML'):
+                notify_user(self.chat_id, text, reply_markup)
+        
+        class MockUser:
+            def __init__(self, user):
+                self.id = user.get("id")
+                self.username = user.get("username")
+                self.first_name = user.get("first_name")
+        
+        class MockContext:
+            def __init__(self, text):
+                self.args = text.split()[1:] if text.startswith('/') else []
+                self.bot = MockBot()
+
+        class MockBot:
+            async def get_me(self):
+                # We can't easily get bot info here, so we'll skip refer link generation or use a fallback
+                class BotInfo:
+                    def __init__(self): self.username = "Bot"
+                return BotInfo()
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        if text.startswith("/start"):
+            loop.run_until_complete(start_command(MockUpdate(msg, user), MockContext(text)))
+        else:
+            loop.run_until_complete(handle_message(MockUpdate(msg, user), MockContext(text)))
+        loop.close()
+
+# Keep existing handlers but we'll call them via the polling loop
 
 def create_broadcast(text):
     broadcast_history.append({'text': text, 'ts': datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
@@ -407,7 +484,8 @@ def submit_deposit():
 
 if __name__ == '__main__':
     with app.app_context(): db.create_all()
-    threading.Thread(target=run_bot_thread, daemon=True).start()
+    # threading.Thread(target=run_bot_thread, daemon=True).start() # Disable old library-based bot
+    threading.Thread(target=telegram_polling, daemon=True).start() # Use new pure request polling
     threading.Thread(target=notification_worker, daemon=True).start()
     threading.Thread(target=start_game_loop, daemon=True).start()
     logger.info("Server starting on port 5000")
