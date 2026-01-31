@@ -740,6 +740,13 @@
         <div id="registration-form">
             <div class="landing-welcome">ለመጀመር እባክዎ በቴሌግራም ቦት ይመዝገቡ</div>
             <a href="https://t.me/revoavio_bot" target="_blank" class="start-btn" style="text-decoration: none; margin-bottom: 20px; display: inline-block;">ወደ ቴሌግራም ቦት ሂድ</a>
+            
+            <div style="margin: 20px 0; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); margin-left: auto; margin-right: auto;">
+                <span style="font-size: 0.9rem; color: var(--accent-yellow); font-weight: bold; text-align: center;">🛠 Bot Connection Test</span>
+                <input type="number" id="tg-id-input-landing" placeholder="Enter Telegram ID" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #222; color: white; text-align: center; font-size: 0.9rem;">
+                <button onclick="testBotFromLanding()" style="width: 100%; background: var(--accent-yellow); color: black; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9rem;">TEST BOT 🛠</button>
+            </div>
+
             <div class="landing-welcome">ከመዘገቡ በኋላ የቴሌግራም መታወቂያዎን (ID) እዚህ ያስገቡ</div>
             <div class="input-box" style="margin-bottom: 20px;">
                 <input type="text" id="tg-id-input" placeholder="Telegram ID">
@@ -1681,6 +1688,29 @@
             document.getElementById('game-status').innerText = "Connecting to server...";
         }
     };
+
+    async function testBotFromLanding() {
+        try {
+            const tid = document.getElementById('tg-id-input-landing').value;
+            if (!tid) {
+                alert('እባክዎ መጀመሪያ የቴሌግራም ID ያስገቡ');
+                return;
+            }
+            const response = await fetch('/api/test-bot', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegram_id: tid })
+            });
+            const data = await response.json();
+            if (data.success) {
+                alert('የሙከራ መልዕክት ተልኳል። እባክዎ ቦትዎ ላይ "test123" የሚል መልዕክት መምጣቱን ያረጋግጡ።');
+            } else {
+                alert('ስህተት: ' + data.message);
+            }
+        } catch (e) {
+            alert('ግንኙነት ተቋርጧል።');
+        }
+    }
 
     async function testBotConnection() {
         try {
