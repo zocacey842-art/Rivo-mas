@@ -398,47 +398,59 @@ async def button_handler(update, context):
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    if not TELEGRAM_BOT_TOKEN:
-        return 'Bot token not set', 400
-    
-    # Process updates asynchronously for webhook
-    update = Update.de_json(request.get_json(force=True), app_bot.bot)
-    
-    asyncio.run_coroutine_threadsafe(app_bot.process_update(update), bot_loop)
-    
-    return 'ok'
+    try:
+        if not TELEGRAM_BOT_TOKEN:
+            logger.error("Webhook received but TELEGRAM_BOT_TOKEN is not set")
+            return 'Bot token not set', 400
+        
+        json_data = request.get_json(force=True)
+        logger.info(f"Webhook received data: {json_data}")
+        
+        # Process updates asynchronously for webhook
+        update = Update.de_json(json_data, app_bot.bot)
+        
+        asyncio.run_coroutine_threadsafe(app_bot.process_update(update), bot_loop)
+        return 'ok'
+    except Exception as e:
+        logger.error(f"Error processing webhook: {e}", exc_info=True)
+        return 'error', 500
 
 def run_bot_thread():
     global bot_loop, app_bot
-    bot_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(bot_loop)
-    
-    app_bot = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    
-    app_bot.add_handler(CommandHandler("start", start_command))
-    app_bot.add_handler(MessageHandler(filters.CONTACT, contact_handler))
-    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app_bot.add_handler(CallbackQueryHandler(button_handler))
-    
-    # Initialize application
-    bot_loop.run_until_complete(app_bot.initialize())
-    
-    # Set webhook
-    webhook_url = os.environ.get('REPLIT_DEV_DOMAIN') or os.environ.get('RENDER_EXTERNAL_URL')
-    
-    if not webhook_url:
-        logger.warning("No domain found in environment variables. Webhook might not work correctly.")
-        return
+    try:
+        bot_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(bot_loop)
+        
+        logger.info("Initializing bot application...")
+        app_bot = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+        
+        app_bot.add_handler(CommandHandler("start", start_command))
+        app_bot.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+        app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        app_bot.add_handler(CallbackQueryHandler(button_handler))
+        
+        # Initialize application
+        bot_loop.run_until_complete(app_bot.initialize())
+        
+        # Set webhook
+        webhook_url = os.environ.get('REPLIT_DEV_DOMAIN') or os.environ.get('RENDER_EXTERNAL_URL')
+        
+        if not webhook_url:
+            logger.error("CRITICAL: No domain found for webhook! Set REPLIT_DEV_DOMAIN or RENDER_EXTERNAL_URL")
+            return
 
-    if not webhook_url.startswith('http'):
-        webhook_url = f"https://{webhook_url}"
-    
-    webhook_url = f"{webhook_url.rstrip('/')}/webhook"
-    
-    logger.info(f"Setting webhook to: {webhook_url}")
-    bot_loop.run_until_complete(app_bot.bot.set_webhook(url=webhook_url))
-    
-    bot_loop.run_forever()
+        if not webhook_url.startswith('http'):
+            webhook_url = f"https://{webhook_url}"
+        
+        webhook_url = f"{webhook_url.rstrip('/')}/webhook"
+        
+        logger.info(f"Setting webhook to: {webhook_url}")
+        bot_loop.run_until_complete(app_bot.bot.set_webhook(url=webhook_url))
+        
+        logger.info("Bot loop starting...")
+        bot_loop.run_forever()
+    except Exception as e:
+        logger.error(f"Fatal error in bot thread: {e}", exc_info=True)
 
 if __name__ == '__main__':
     # Initialize DB and data
