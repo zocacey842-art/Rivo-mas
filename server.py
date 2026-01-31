@@ -226,29 +226,45 @@ def game_loop():
 
 # --- Telegram Bot Handlers ---
 async def start_command(update, context):
-    chat_id = str(update.message.chat_id)
-    ref = context.args[0] if context.args else None
-    if chat_id not in users:
-        users[chat_id] = {
-            'phone': None, 
-            'balance': 5.0, 
-            'referred_by': ref, 
-            'reg_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'total_deposited': 0
-        }
-        if ref and ref in users and ref != chat_id:
-            users[ref]['balance'] += 2.0
-            notify_user(ref, "<b>🎁 የሪፈራል ቦነስ!</b>\n\nአዲስ ሰው ስለጋበዙ <b>2.00 ETB</b> ተጨምሯል። 🎊")
-        sync_db()
-    
-    if not users[chat_id].get('phone'):
-        btn = KeyboardButton(text="📱 ስልክ ቁጥርዎን ያጋሩ", request_contact=True)
-        await update.message.reply_text(
-            "👋 **እንኳን በደህና መጡ!**\n\nለመመዝገብ እና ጨዋታውን ለመጀመር እባክዎ ስልክዎን ያጋሩ። 👇", 
-            reply_markup=ReplyKeyboardMarkup([[btn]], resize_keyboard=True),
-            parse_mode='Markdown'
-        )
-    else: await show_main_menu(update, chat_id)
+    try:
+        chat_id = str(update.message.chat_id)
+        ref = context.args[0] if context.args else None
+        
+        if chat_id not in users:
+            users[chat_id] = {
+                'phone': None, 
+                'balance': 5.0, 
+                'referred_by': ref, 
+                'reg_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'total_deposited': 0
+            }
+            if ref and ref in users and ref != chat_id:
+                users[ref]['balance'] = float(users[ref].get('balance', 0)) + 2.0
+                notify_user(ref, "<b>🎁 የሪፈራል ቦነስ!</b>\n\nአዲስ ሰው ስለጋበዙ <b>2.00 ETB</b> ተጨምሯል። 🎊")
+            sync_db()
+        else:
+            # Ensure consistency and prevent crashes with old data
+            user = users[chat_id]
+            user['balance'] = float(user.get('balance', 0))
+            user['total_deposited'] = float(user.get('total_deposited', 0))
+            if 'reg_date' not in user:
+                user['reg_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        user = users[chat_id]
+        if not user.get('phone'):
+            btn = KeyboardButton(text="📱 ስልክ ቁጥርዎን ያጋሩ", request_contact=True)
+            await update.message.reply_text(
+                "👋 **እንኳን በደህና መጡ!**\n\nለመመዝገብ እና ጨዋታውን ለመጀመር እባክዎ ስልክዎን ያጋሩ። 👇", 
+                reply_markup=ReplyKeyboardMarkup([[btn]], resize_keyboard=True, one_time_keyboard=True),
+                parse_mode='Markdown'
+            )
+        else:
+            await show_main_menu(update, chat_id)
+    except Exception as e:
+        logger.error(f"Error in start_command: {e}")
+        try:
+            await update.message.reply_text("⚠️ ይቅርታ፣ ሲስተሙ ላይ ትንሽ መቆራረጥ አጋጥሟል። እባክዎ ትንሽ ቆይተው ይሞክሩ።")
+        except: pass
 
 async def contact_handler(update, context):
     chat_id = str(update.message.chat_id)
