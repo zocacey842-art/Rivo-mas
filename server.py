@@ -36,7 +36,7 @@ db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Configuration
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+TELEGRAM_BOT_TOKEN = "8320652785:AAH93UEakNRv09A_MMnFlEh-x8Zs481AhFw"
 DOMAIN = os.environ.get('REPLIT_DEV_DOMAIN')
 ADMIN_CHAT_ID = os.environ.get('ADMIN_CHAT_ID')
 
