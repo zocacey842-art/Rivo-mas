@@ -305,11 +305,18 @@ def run_bot_thread():
             bot_loop.run_until_complete(app_bot.bot.set_webhook(url=full_webhook_url))
         
         logger.info("Bot loop starting...")
+        # Check if we are in production (webhook mode) or development (polling)
         if os.environ.get('RENDER_EXTERNAL_URL'):
             logger.info("Production mode: Webhook active")
+            if webhook_url:
+                if not webhook_url.startswith('http'): webhook_url = f"https://{webhook_url}"
+                full_webhook_url = f"{webhook_url.rstrip('/')}/webhook"
+                logger.info(f"Setting webhook to: {full_webhook_url}")
+                bot_loop.run_until_complete(app_bot.bot.set_webhook(url=full_webhook_url, drop_pending_updates=True))
             bot_loop.run_forever()
         else:
             logger.info("Development mode: Polling")
+            bot_loop.run_until_complete(app_bot.bot.delete_webhook(drop_pending_updates=True))
             app_bot.run_polling(close_loop=False)
     except Exception as e:
         logger.error(f"Fatal bot error: {e}", exc_info=True)
