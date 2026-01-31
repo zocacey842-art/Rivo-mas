@@ -415,6 +415,14 @@ def webhook():
         logger.error(f"Error processing webhook: {e}", exc_info=True)
         return 'error', 500
 
+@app.route('/api/test-bot', methods=['POST'])
+def test_bot():
+    tid = str(request.json.get('telegram_id'))
+    if not tid:
+        return jsonify({'success': False, 'message': 'Telegram ID missing'}), 400
+    notify_user(tid, "<b>🛠 Bot Test:</b> test123")
+    return jsonify({'success': True, 'message': 'Test message sent'})
+
 def run_bot_thread():
     global bot_loop, app_bot
     try:

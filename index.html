@@ -1681,6 +1681,29 @@
             document.getElementById('game-status').innerText = "Connecting to server...";
         }
     };
+
+    async function testBotConnection() {
+        try {
+            const tid = document.getElementById('tg-id-input').value;
+            if (!tid) {
+                alert('እባክዎ መጀመሪያ የቴሌግራም ID ያስገቡ');
+                return;
+            }
+            const response = await fetch('/api/test-bot', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegram_id: tid })
+            });
+            const data = await response.json();
+            if (data.success) {
+                alert('የሙከራ መልዕክት ተልኳል። እባክዎ ቦትዎ ላይ "test123" የሚል መልዕክት መምጣቱን ያረጋግጡ።');
+            } else {
+                alert('ስህተት: ' + data.message);
+            }
+        } catch (e) {
+            alert('ግንኙነት ተቋርጧል።');
+        }
+    }
 </script>
 
 </body>
