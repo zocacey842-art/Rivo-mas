@@ -101,27 +101,35 @@ def sync_db():
 
 # --- Notification Queue Service ---
 def notify_user(chat_id, text, reply_markup=None):
-    if not TELEGRAM_BOT_TOKEN or not chat_id: return
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": int(chat_id),
-            "text": text,
-            "parse_mode": "HTML"
-        }
-        if reply_markup:
-            payload["reply_markup"] = json.dumps(reply_markup.to_dict() if hasattr(reply_markup, 'to_dict') else reply_markup)
-        
-        # Use a background thread for non-blocking HTTP request
-        def send_request():
-            try:
-                requests.post(url, json=payload, timeout=10)
-            except:
-                pass
-        
-        threading.Thread(target=send_request).start()
-    except Exception as e:
-        logger.error(f"Error in notify_user: {e}")
+    # 1. መረጃው መኖሩን ማረጋገጥ
+    if not TELEGRAM_BOT_TOKEN or not chat_id:
+        return
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    
+    # 2. ፔይሎዱን ማዘጋጀት
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+    
+    if reply_markup:
+        payload["reply_markup"] = json.dumps(reply_markup)
+
+    # 3. መልዕክቱን የሚልከው ውስጣዊ ፈንክሽን
+    def send_request():
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status() # ስህተት ካለ እዚህ ጋር ይታወቃል
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Telegram notification failed: {e}")
+
+    # 4. በጀርባ እንዲሰራ ማድረግ (Background Thread)
+    # ማሳሰቢያ፡ ለትልቅ ፕሮጀክት ከሆነ 'Celery' ወይም 'Task Queue' መጠቀም ይሻላል
+    thread = threading.Thread(target=send_request)
+    thread.daemon = True # ዋናው ፕሮግራም ሲዘጋ አብሮ እንዲዘጋ
+    thread.start()
 
 def notify_admin(text, reply_markup=None):
     if ADMIN_CHAT_ID:
