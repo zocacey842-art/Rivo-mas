@@ -165,6 +165,13 @@ def notification_worker():
 async def start_command(update: Update, context):
     user = update.effective_user
     tid = str(user.id)
+    keyboard = [
+        [KeyboardButton("🎮 ጨዋታውን ክፈት")],
+        [KeyboardButton("💰 ተቀማጭ / Deposit"), KeyboardButton("💸 ወጪ / Withdraw")],
+        [KeyboardButton("👤 ፕሮፋይል / Profile"), KeyboardButton("📞 ድጋፍ / Support")]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    
     if tid not in users:
         users[tid] = {
             'tg_id': tid,
@@ -177,12 +184,12 @@ async def start_command(update: Update, context):
         sync_db()
         await update.message.reply_html(
             f"<b>እንኳን ደህና መጡ {user.first_name}!</b>\n\nየእርስዎ ID: <code>{tid}</code>\nየመጀመሪያ ቦነስ: 5 ETB ተሰጥቶዎታል።\n\nለመጫወት ይህንን ID በዌብሳይቱ ላይ ይጠቀሙ።",
-            reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🎮 ጨዋታውን ክፈት"), KeyboardButton("💰 ተቀማጭ / ወጪ")]], resize_keyboard=True)
+            reply_markup=reply_markup
         )
     else:
         await update.message.reply_html(
             f"<b>እንኳን በደህና ተመለሱ!</b>\n\nየእርስዎ ID: <code>{tid}</code>\nቀሪ ሂሳብ: {users[tid]['balance']:.2f} ETB",
-            reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🎮 ጨዋታውን ክፈት"), KeyboardButton("💰 ተቀማጭ / ወጪ")]], resize_keyboard=True)
+            reply_markup=reply_markup
         )
 
 async def contact_handler(update: Update, context):
@@ -190,12 +197,31 @@ async def contact_handler(update: Update, context):
 
 async def handle_message(update: Update, context):
     text = update.message.text
+    tid = str(update.effective_user.id)
+    
     if text == "🎮 ጨዋታውን ክፈት":
-        await update.message.reply_html(f"<b>ጨዋታውን ለመጀመር:</b>\n{DOMAIN}")
-    elif text == "💰 ተቀማጭ / ወጪ":
-        await update.message.reply_html("<b>የሂሳብ አያያዝ</b>", reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ ተቀማጭ (Deposit)", callback_data="show_dep"), InlineKeyboardButton("➖ ወጪ (Withdraw)", callback_data="show_with")]
-        ]))
+        await update.message.reply_html(f"<b>ጨዋታውን ለመጀመር ይህንን ሊንክ ይጫኑ:</b>\n{DOMAIN}")
+    elif text == "💰 ተቀማጭ / Deposit":
+        await update.message.reply_html(
+            "<b>💰 ብር ለማስገባት (Deposit)</b>\n\n"
+            "1. በቴሌብር በዚህ ቁጥር ይላኩ: <code>0975118009</code>\n"
+            "2. የላኩበትን ትክክለኛ ቴክስት ኮፒ አድርገው በዌብሳይቱ 'Deposit' ክፍል ላይ ይላኩ።\n"
+            "3. አድሚን ሲያረጋግጥ በ 5-10 ደቂቃ ውስጥ ብሩ ይገባላችኋል።",
+            parse_mode='HTML'
+        )
+    elif text == "💸 ወጪ / Withdraw":
+        await update.message.reply_html(f"<b>💸 ብር ለማውጣት</b>\n\nቀሪ ሂሳብዎ: {users.get(tid, {}).get('balance', 0):.2f} ETB\n\nብሩን ለማውጣት በዌብሳይቱ ላይ ያለውን 'Withdraw' ቁልፍ ይጠቀሙ።")
+    elif text == "👤 ፕሮፋይል / Profile":
+        user_data = users.get(tid, {})
+        await update.message.reply_html(
+            f"<b>👤 የእርስዎ መረጃ</b>\n\n"
+            f"መታወቂያ (ID): <code>{tid}</code>\n"
+            f"ስም: {user_data.get('username', 'N/A')}\n"
+            f"ቀሪ ሂሳብ: {user_data.get('balance', 0):.2f} ETB\n"
+            f"የተቀመጠ ብር: {user_data.get('total_deposited', 0):.2f} ETB"
+        )
+    elif text == "📞 ድጋፍ / Support":
+        await update.message.reply_html("<b>📞 የድጋፍ መስጫ</b>\n\nማንኛውም ጥያቄ ወይም እርዳታ ካስፈለገዎት አድሚኑን ያነጋግሩ:\n@revo_admin")
 
 async def button_handler(update: Update, context):
     query = update.callback_query
