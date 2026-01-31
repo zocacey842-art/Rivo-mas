@@ -100,12 +100,15 @@ def sync_db():
 def notify_user(chat_id, text, reply_markup=None):
     if not TELEGRAM_BOT_TOKEN or not chat_id: return
     try:
+        logger.info(f"Notify User: Attempting to send message to {chat_id}")
         if app_bot and bot_loop:
             asyncio.run_coroutine_threadsafe(
                 app_bot.bot.send_message(chat_id=chat_id, text=text, parse_mode='HTML', reply_markup=reply_markup),
                 bot_loop
             )
+            logger.info(f"Notify User: Message task scheduled for {chat_id}")
         else:
+            logger.warning(f"Notify User: Bot not ready, queuing message for {chat_id}")
             notif = {
                 'chat_id': str(chat_id),
                 'text': text,
@@ -115,7 +118,7 @@ def notify_user(chat_id, text, reply_markup=None):
             notification_queue.append(notif)
             sync_db()
     except Exception as e:
-        logger.error(f"Error in notify_user: {e}")
+        logger.error(f"Error in notify_user: {e}", exc_info=True)
 
 def notification_worker():
     logger.info("Notification worker thread started")
